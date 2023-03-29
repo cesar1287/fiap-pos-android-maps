@@ -1,10 +1,11 @@
-package com.github.cesar1287.mapsandroid
+package com.github.cesar1287.mapsandroid.home
 
 import android.content.Intent
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Toast
+import com.github.cesar1287.mapsandroid.maps.MapsActivity
 import com.github.cesar1287.mapsandroid.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
