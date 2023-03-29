@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
-import android.location.Address
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.inputmethod.InputMethodManager
@@ -97,10 +96,6 @@ class MapsActivity : AppCompatActivity() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(binding.edtSearch.windowToken, 0)
         viewModel.searchAddress(binding.edtSearch.text.toString())
-    }
-
-    private fun showAddressListDialog(addresses: List<Address>) {
-        //AddressListFragment.newInstance(addresses).show(supportFragmentManager, null)
     }
 
     private fun showProgress(message: String) {
