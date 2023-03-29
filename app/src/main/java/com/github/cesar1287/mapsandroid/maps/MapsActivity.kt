@@ -84,8 +84,8 @@ class MapsActivity : AppCompatActivity() {
         viewModel.getAddresses().observe(
             this
         ) { addresses ->
-            if (addresses != null) {
-                //showAddressListDialog(addresses)
+            addresses?.firstOrNull()?.let {
+                viewModel.updateMapStateFromAddress(it)
             }
         }
 
@@ -104,10 +104,8 @@ class MapsActivity : AppCompatActivity() {
     }
 
     private fun hideProgress() {
-        binding.loading.llProgress.isVisible = true
+        binding.loading.llProgress.isVisible = false
     }
-
-
 
     private fun handleConnectionError(result: ConnectionResult) {
         if (result.hasResolution()) {

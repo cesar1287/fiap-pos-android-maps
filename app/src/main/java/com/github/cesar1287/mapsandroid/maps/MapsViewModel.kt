@@ -201,4 +201,12 @@ class MapsViewModel(
             googleApiClient?.disconnect()
         }
     }
+
+    fun updateMapStateFromAddress(address: Address) {
+        val latLng = LatLng(
+            address.latitude,
+            address.longitude
+        )
+        mapState.value = mapState.value?.copy(origin = latLng)
+    }
 }
