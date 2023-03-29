@@ -35,10 +35,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         supportFragmentManager.findFragmentById(R.id.map) as MyMapFragment
     }
 
+    private var isGpsDialogOpened: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
+
+        isGpsDialogOpened = savedInstanceState?.getBoolean(EXTRA_GPS_DIALOG) ?: false
     }
 
     override fun onStart() {
@@ -86,9 +89,16 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun handleLocationError(error: LocationError?) {
         if (error != null) {
             when (error) {
-                is LocationError.ErrorLocationUnavailable -> showError("Não foi possivel obter a localização atual")
-                is LocationError.GpsDisabled -> showError("Não foi possivel obter a localização atual")
-                is LocationError.GpsSettingUnavailable -> showError("Não foi possivel obter a localização atual")
+                is LocationError.ErrorLocationUnavailable ->
+                    showError("Não foi possivel obter a localização atual")
+                is LocationError.GpsDisabled -> {
+                    if (!isGpsDialogOpened) {
+                        isGpsDialogOpened = true
+                        error.exception.startResolutionForResult (this, REQUEST_CHECK_GPS)
+                    }
+                }
+                is LocationError.GpsSettingUnavailable ->
+                    showError("Não foi possível habilitar a localização")
             }
         }
     }
@@ -116,11 +126,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
         if (requestCode == REQUEST_ERROR_PLAY_SERVICES && resultCode == Activity.RESULT_OK) {
             viewModel.connectGoogleApiClient()
+        } else if (requestCode == REQUEST_CHECK_GPS) {
+            isGpsDialogOpened = false
+            if (resultCode == RESULT_OK) {
+                loadLastLocation()
+            } else {
+                Toast.makeText(this, "GPS desabilitado", Toast.LENGTH_SHORT)
+                    .show()
+                finish()
+            }
         }
     }
 
@@ -156,6 +178,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     companion object {
         private const val REQUEST_ERROR_PLAY_SERVICES = 1
         private const val REQUEST_PERMISSIONS = 2
+        private const val REQUEST_CHECK_GPS = 3
+        private const val EXTRA_GPS_DIALOG = "gpsDialogIsOpen"
     }
 
 /**

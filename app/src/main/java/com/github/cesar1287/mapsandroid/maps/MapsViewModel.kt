@@ -2,7 +2,9 @@ package com.github.cesar1287.mapsandroid.maps
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.location.Location
 import android.os.Bundle
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -10,14 +12,14 @@ import androidx.lifecycle.viewModelScope
 import com.github.cesar1287.mapsandroid.model.GoogleApiConnectionStatus
 import com.github.cesar1287.mapsandroid.model.LocationError
 import com.github.cesar1287.mapsandroid.model.MapState
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 class MapsViewModel(
@@ -53,40 +55,86 @@ class MapsViewModel(
         return mapState
     }
 
+    private suspend fun checkGpsStatus(): Boolean = suspendCoroutine { continuation ->
+        val request =
+            LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+        val locationSettingsRequest = LocationSettingsRequest.Builder().setAlwaysShow(true)
+            .addLocationRequest(request)
+        SettingsClient(getContext()).checkLocationSettings(
+            locationSettingsRequest.build()
+        ).addOnCompleteListener { task ->
+            try {
+                task.getResult(ApiException::class.java)
+                continuation.resume(true)
+            } catch (exception: ApiException) {
+                continuation.resumeWithException(exception)
+            }
+        }.addOnCanceledListener { continuation.resume(false) }
+    }
+
+
     fun getUserLocation() {
         viewModelScope.launch {
             currentLocationError.value = try {
-                val success = withContext(Dispatchers.Default) { loadLastLocation() }
-                if (success) {
-                    null
-                } else {
+                checkGpsStatus()
+                val success = withTimeout(20000) { loadLastLocation() }
+                if (success) {null} else {
                     LocationError.ErrorLocationUnavailable
                 }
-            } catch (e: Exception) {
+            } catch (timeout: TimeoutCancellationException) {
                 LocationError.ErrorLocationUnavailable
+            } catch (exception: ApiException) {
+                when (exception.statusCode) {
+                    LocationSettingsStatusCodes.RESOLUTION_REQUIRED ->
+                        LocationError.GpsDisabled(exception as ResolvableApiException)
+                    LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE ->
+                        LocationError.GpsSettingUnavailable
+                    else -> LocationError.ErrorLocationUnavailable
+                }
             }
-
         }
     }
 
     @SuppressLint("MissingPermission")
     private suspend fun loadLastLocation(): Boolean = suspendCoroutine { continuation ->
-        locationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                val latLng = LatLng(
-                    location.latitude,
-                    location.longitude
-                )
-                mapState.value = mapState.value?.copy(origin = latLng)
-                continuation.resume(true)
-            } else {
-                continuation.resume(false)
-            }
-        }.addOnFailureListener {
-            continuation.resume(false)
-        }.addOnCanceledListener { continuation.resume(false) }
-    }
+        fun updateOriginByLocation(location: Location) {
+            val latLng = LatLng(
+                location.latitude,
+                location.longitude
+            )
+            mapState.value = mapState.value?.copy(origin = latLng)
+            continuation.resume(true)
+        }
 
+        fun waitForLocation() {
+            val locationRequest =
+                LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                    .setInterval(5 * 1000)
+                    .setFastestInterval(1 * 1000)
+            locationClient.requestLocationUpdates(locationRequest, object : LocationCallback() {
+
+                override fun onLocationResult(result: LocationResult) {
+                    super.onLocationResult(result)
+                    locationClient.removeLocationUpdates(this)
+                    val location = result.lastLocation
+                    if (location != null) {
+                        updateOriginByLocation(location)
+                    } else {
+                        continuation.resume(false)
+                    }
+                }
+            }, Looper.getMainLooper())
+        }
+
+        locationClient.lastLocation.addOnSuccessListener { location ->
+            if (location == null) {
+                waitForLocation()
+            } else {
+                updateOriginByLocation(location)
+            }
+        }.addOnFailureListener { waitForLocation() }
+            .addOnCanceledListener { continuation.resume(false) }
+    }
 
     fun connectGoogleApiClient() {
         if (googleApiClient == null) {
