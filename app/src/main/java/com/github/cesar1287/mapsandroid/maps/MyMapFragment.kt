@@ -37,7 +37,7 @@ class MyMapFragment : SupportMapFragment() {
         viewModel.getMapState().observe(
             this
         ) { mapState ->
-            if (mapState != null) {
+            mapState?.let {
                 updateMap(mapState)
             }
         }
