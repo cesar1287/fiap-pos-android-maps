@@ -2,6 +2,8 @@ package com.github.cesar1287.mapsandroid.maps
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.os.Bundle
 import android.os.Looper
@@ -18,6 +20,7 @@ import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.*
+import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -33,6 +36,9 @@ class MapsViewModel(
             getContext()
         )
     }
+
+    private val addresses = MutableLiveData<List<Address>?>()
+    private val loading = MutableLiveData<Boolean>()
 
     private val currentLocationError = MutableLiveData<LocationError>()
 
@@ -54,6 +60,39 @@ class MapsViewModel(
     fun getMapState(): LiveData<MapState> {
         return mapState
     }
+
+    fun searchAddress(search: String) {
+        viewModelScope.launch {
+            loading.value = true
+            val geoCoder = Geocoder(
+                getContext(),
+                Locale.getDefault()
+            )
+            addresses.value = withContext(Dispatchers.IO) {
+                geoCoder.getFromLocationName(search, 10)
+            }
+            loading.value = false
+        }
+    }
+
+
+    fun getAddresses(): LiveData<List<Address>?> {
+        return addresses
+    }
+
+    fun isLoading(): LiveData<Boolean> {
+        return loading
+    }
+
+    fun clearSearchAddressResult() {
+        addresses.value = null
+    }
+
+    fun setDestination(latLng: LatLng) {
+        addresses.value = null
+        mapState.value = mapState.value?.copy(destination = latLng)
+    }
+
 
     private suspend fun checkGpsStatus(): Boolean = suspendCoroutine { continuation ->
         val request =

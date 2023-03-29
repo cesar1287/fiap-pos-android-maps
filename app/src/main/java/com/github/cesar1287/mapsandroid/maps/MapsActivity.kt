@@ -4,11 +4,14 @@ import android.app.Activity
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.location.Address
 import android.location.Geocoder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
 import com.github.cesar1287.mapsandroid.R
 import com.google.android.gms.maps.GoogleMap
@@ -72,7 +75,49 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         viewModel.getCurrentLocationError().observe(
             this
         ) { error -> handleLocationError(error) }
+
+        viewModel.isLoading().observe(this) { value ->
+            if (value != null) {
+                binding.btnSearch.isEnabled = !value
+                if (value) {
+                    showProgress("Pesquisando o endereço")
+                } else {
+                    hideProgress()
+                }
+            }
+        }
+
+        viewModel.getAddresses().observe(
+            this
+        ) { addresses ->
+            if (addresses != null) {
+                showAddressListDialog(addresses)
+            }
+        }
+
+        binding.btnSearch.setOnClickListener { searchAddress() }
     }
+
+    private fun searchAddress() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.edtSearch.windowToken, 0)
+        viewModel.searchAddress(binding.edtSearch.text.toString())
+    }
+
+    private fun showAddressListDialog(addresses: List<Address>) {
+        AddressListFragment.newInstance(addresses).show(supportFragmentManager, null)
+    }
+
+    private fun showProgress(message: String) {
+        binding.loading.txtProgress.text = message
+        binding.loading.llProgress.isVisible = true
+    }
+
+    private fun hideProgress() {
+        binding.loading.llProgress.isVisible = true
+    }
+
+
 
     private fun handleConnectionError(result: ConnectionResult) {
         if (result.hasResolution()) {

@@ -6,6 +6,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MarkerOptions
 
 class MyMapFragment : SupportMapFragment() {
@@ -45,12 +46,28 @@ class MyMapFragment : SupportMapFragment() {
     private fun updateMap(mapState: MapState) {
         googleMap?.run {
             clear()
+            val area = LatLngBounds.Builder()
             val origin = mapState.origin
             if (origin != null) {
                 addMarker(
-                    MarkerOptions().position(origin).title("Local atual")
+                    MarkerOptions()
+                        .position(origin).title("Buscando o endereco")
                 )
-                animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17.0f))
+                area.include(origin)
+            }
+
+            val destination = mapState.destination
+            if (destination != null) {
+                addMarker(MarkerOptions().position(destination)
+                    .title("Destino"))
+                area.include(destination)
+            }
+            if (origin != null) {
+                if (destination != null) {
+                    animateCamera(CameraUpdateFactory.newLatLngBounds(area.build(), 50))
+                } else {
+                    animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17f))
+                }
             }
         }
     }
